@@ -1,0 +1,7 @@
+*.log
+*.retry
+*.lock
+.ansible/
+*.tfstate
+*.tfstate.*
+.terraform/
