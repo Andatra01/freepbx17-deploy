@@ -4,11 +4,18 @@
     path: /usr/local/freepbx
   register: freepbx_installed
 
-- name: Обновление системы перед установкой
+- name: Обновление кэша apt (с ожиданием блокировки)
   apt:
     update_cache: yes
-    upgrade: dist
     cache_valid_time: 3600
+    lock_timeout: 60
+  when: not freepbx_installed.stat.exists
+
+- name: Обновление всех пакетов (dist-upgrade) с ожиданием блокировки
+  apt:
+    upgrade: dist
+    update_cache: no   # кэш уже обновлён в предыдущей задаче
+    lock_timeout: 60
   when: not freepbx_installed.stat.exists
 
 - name: Установка необходимых пакетов
@@ -47,7 +54,6 @@
     chdir: /tmp
   when:
     - not freepbx_installed.stat.exists
-    - script_downloaded is changed
   register: install_result
   async: 3600
   poll: 30
