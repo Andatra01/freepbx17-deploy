@@ -1,0 +1,65 @@
+---
+- name: Check if FreePBX is already installed
+  stat:
+    path: /usr/local/freepbx
+  register: freepbx_installed
+
+- name: Обновление системы перед установкой
+  apt:
+    update_cache: yes
+    upgrade: dist
+    cache_valid_time: 3600
+  when: not freepbx_installed.stat.exists
+
+- name: Установка необходимых пакетов
+  apt:
+    name:
+      - curl
+      - wget
+      - git
+      - ca-certificates
+      - software-properties-common
+    state: present
+  when: not freepbx_installed.stat.exists
+
+- name: Загрузка IN1CLICK скрипта
+  get_url:
+    url: https://raw.githubusercontent.com/20telecom/IN1CLICK/main/freepbx17-on-debian12
+    dest: /tmp/IN1CLICK
+    mode: '0755'
+    timeout: 30
+    validate_certs: yes
+  when: not freepbx_installed.stat.exists
+  register: script_downloaded
+
+- name: Создание директории для логов
+  file:
+    path: /var/log/pbx
+    state: directory
+    mode: '0755'
+  when: not freepbx_installed.stat.exists
+
+- name: Запуск IN1CLICK установщика
+  shell: |
+    /tmp/IN1CLICK > /var/log/pbx/install-{{ ansible_date_time.date }}.log 2>&1
+  args:
+    creates: /usr/local/freepbx
+    chdir: /tmp
+  when:
+    - not freepbx_installed.stat.exists
+    - script_downloaded is changed
+  register: install_result
+  async: 3600
+  poll: 30
+
+- name: Проверка успешности установки
+  stat:
+    path: /usr/local/freepbx
+  register: freepbx_after_install
+
+- name: Сообщение о результате
+  debug:
+    msg:
+      - "Установка завершена. Лог сохранён в /var/log/pbx/install-{{ ansible_date_time.date }}.log"
+      - "FreePBX должен быть доступен по адресу http://{{ ansible_default_ipv4.address }}"
+  when: freepbx_after_install.stat.exists
